@@ -290,7 +290,7 @@ svg{display:block;}
   </div>
 
   <main>
-    <p class="app-credit app-credit-top">พัฒนาโดย<br>ดร. ปณวัตร สิขัณฑกสมิต<br>ภาควิชาพืชสวน คณะเกษตร กำแพงแสน มหาวิทยาลัยเกษตรศาสตร์<br>เมทินี พลอยเปลี่ยนแสง<br>กองวิจัยและพัฒนาเทคโนโลยีหลังการเก็บเกี่ยวและแปรรูปผลิตผลเกษตร กรมวิชาการเกษตร</p>
+    <p class="app-credit app-credit-top">พัฒนาโดย ดร. ปณวัตร สิขัณฑกสมิต · ภาควิชาพืชสวน คณะเกษตร กำแพงแสน<br>มหาวิทยาลัยเกษตรศาสตร์</p>
 
     <!-- RECORD VIEW -->
     <div id="view-record">
@@ -338,7 +338,7 @@ svg{display:block;}
       <div id="history-list" style="margin-top:10px;"></div>
     </div>
 
-    <p class="app-credit">พัฒนาโดย<br>ดร. ปณวัตร สิขัณฑกสมิต<br>ภาควิชาพืชสวน คณะเกษตร กำแพงแสน มหาวิทยาลัยเกษตรศาสตร์<br>เมทินี พลอยเปลี่ยนแสง<br>กองวิจัยและพัฒนาเทคโนโลยีหลังการเก็บเกี่ยวและแปรรูปผลิตผลเกษตร กรมวิชาการเกษตร<br><br><span id="visit-counter"></span></p>
+    <p class="app-credit">พัฒนาโดย ดร. ปณวัตร สิขัณฑกสมิต<br>ภาควิชาพืชสวน คณะเกษตร กำแพงแสน<br>มหาวิทยาลัยเกษตรศาสตร์</p>
   </main>
 </div>
 
@@ -430,9 +430,7 @@ const dict = {
   profile_note:{th:'ใช้เพื่อสรุปภาพรวมจำนวนผู้ใช้งานตามจังหวัดเท่านั้น ไม่ระบุตัวตน ไม่กระทบการใช้งานแอป ข้ามได้ตลอดเวลา',en:'Used only for aggregate visits-by-province statistics. Not identifying, never affects how the app works, and you can skip this.'},
   profile_province:{th:'จังหวัด',en:'Province'},
   profile_skip:{th:'ข้ามไปก่อน',en:'Skip'},
-  profile_submit:{th:'บันทึก',en:'Save'},
-  visit_count:{th:'มีผู้เข้าใช้แอปแล้ว',en:'App opened'},
-  visit_times:{th:'ครั้ง',en:'times'}
+  profile_submit:{th:'บันทึก',en:'Save'}
 };
 let lang = 'th';
 function t(key){ return dict[key] ? dict[key][lang] : key; }
@@ -446,7 +444,6 @@ function setLang(l){
   });
   if(typeof farms !== 'undefined') renderFarms();
   renderHistory();
-  if(supabaseReady) showVisitCount();
 }
 
 /* ---------- view switching ---------- */
@@ -849,26 +846,8 @@ async function initSupabase(){
     currentUserId = data.user.id;
   }
   supabaseReady = true;
-  await logVisit();
-  showVisitCount();
+  logVisit();
   checkProfilePrompt();
-}
-
-/* read total app-open count from the same app_sessions table and show it
-   in the footer — counts this app only (app_name = 'avocado') */
-async function showVisitCount(){
-  const el = document.getElementById('visit-counter');
-  if(!el) return;
-  try{
-    const { count, error } = await sb
-      .from('app_sessions')
-      .select('*', { count: 'exact', head: true })
-      .eq('app_name', 'avocado');
-    if(error){ console.warn('[visit-counter] Supabase error:', error.message, '— ตรวจ RLS policy: role anon ต้องมีสิทธิ์ SELECT บนตาราง app_sessions'); return; }
-    if(count===null || count===undefined){ console.warn('[visit-counter] count is null — likely RLS blocks SELECT for anon'); return; }
-    console.log('[visit-counter] count =', count);
-    el.textContent = t('visit_count') + ' ' + count.toLocaleString(lang==='th'?'th-TH':'en-US') + ' ' + t('visit_times');
-  }catch(e){ console.warn('[visit-counter] exception:', e.message); }
 }
 
 /* usage analytics: one row per app open — query this table directly
