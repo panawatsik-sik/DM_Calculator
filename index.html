@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>แอปหาน้ำหนักแห้งอะโวคาโด — Avocado Dry Matter Calculator</title>
+<title>แอปหาน้ำหนักแห้งทุเรียนและอะโวคาโด — Durian & Avocado Dry Matter Calculator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700&family=Noto+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -72,6 +72,17 @@ h1,h2,h3,.display{
   border-radius:999px;cursor:pointer;font-family:inherit;font-weight:500;
 }
 .lang-toggle button.active{background:var(--gold);color:var(--forest);}
+.fruit-toggle{display:flex;gap:8px;margin-top:1rem;background:rgba(255,255,255,0.10);padding:5px;border-radius:12px;}
+.fruit-btn{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+  border:none;background:transparent;color:#C9D6C4;font-family:'Kanit',sans-serif;
+  font-weight:600;font-size:14.5px;padding:9px 10px;border-radius:9px;cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.fruit-btn.active{background:var(--gold);color:var(--forest);}
+.fruit-ico{font-size:17px;line-height:1;}
+.fruit-ico-svg{display:inline-flex;align-items:center;}
+.fruit-ico-svg svg{display:block;}
 .tabs{display:flex;gap:8px;margin-top:1.1rem;}
 .header-durian{
   position:absolute;top:-22px;right:-18px;z-index:0;pointer-events:none;
@@ -276,6 +287,14 @@ svg{display:block;}
       <circle cx="50" cy="60" r="17" fill="#3F8F5C" opacity="0.85"/>
       <path d="M47 12 Q48 2 58 4" stroke="#3F8F5C" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.9"/>
     </svg>
+    <div class="fruit-toggle">
+      <button id="fruit-durian" class="fruit-btn active" onclick="setFruit('durian')">
+        <span class="fruit-ico fruit-ico-svg" aria-hidden="true"><svg viewBox="0 0 32 32" width="18" height="18"><g><ellipse cx="16" cy="17" rx="9.5" ry="11" fill="#7B9A3A"/><ellipse cx="16" cy="17" rx="9.5" ry="11" fill="none" stroke="#5F7D28" stroke-width="1"/><path d="M15 5.6c.3-1 1.7-1 2 0l.5 1.8-1.5-.7-1.5.7z" fill="#8A6A3A"/><g fill="#A9C15E" stroke="#5F7D28" stroke-width="0.5"><path d="M16 7.5l1.5 3-3 0z"/><path d="M9.5 11l2.6 1.8-2.9 1z"/><path d="M22.5 11l-2.6 1.8 2.9 1z"/><path d="M7.5 16l3 1-3 1.3z"/><path d="M24.5 16l-3 1 3 1.3z"/><path d="M8.7 21.5l2.9-.6-1.6 2.6z"/><path d="M23.3 21.5l-2.9-.6 1.6 2.6z"/><path d="M13 24.5l3 .6 3-.6-1.6 2.8-1.4.9-1.4-.9z"/><path d="M16 13l1.4 2.7-2.8 0z"/><path d="M12.5 17l1.4 2.7-2.8 0z"/><path d="M19.5 17l1.4 2.7-2.8 0z"/><path d="M16 20.3l1.4 2.7-2.8 0z"/></g></g></svg></span><span data-i18n="fruit_durian">ทุเรียน</span>
+      </button>
+      <button id="fruit-avocado" class="fruit-btn" onclick="setFruit('avocado')">
+        <span class="fruit-ico">🥑</span><span data-i18n="fruit_avocado">อะโวคาโด</span>
+      </button>
+    </div>
     <div class="tabs">
       <button class="tab-btn active" id="tab-record" onclick="showView('record')">
         <i>✎</i><span data-i18n="tab_record">บันทึกผล</span>
@@ -319,7 +338,7 @@ svg{display:block;}
       <button class="primary-btn" onclick="calculateAndSaveAll()">
         <span>💾</span><span data-i18n="btn_calc_save_all">คำนวณและบันทึกทั้งหมด</span>
       </button>
-      <p class="disclaimer" data-i18n="disclaimer">ผลลัพธ์นี้เป็นเครื่องมือช่วยตัดสินใจเบื้องต้น ไม่ใช่ผลตรวจรับรองทางการจากหน่วยงานรัฐ</p>
+      
 
       <!-- BATCH RESULTS -->
       <div id="batch-results" class="hidden" style="margin-top:14px;"></div>
@@ -352,6 +371,89 @@ svg{display:block;}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ---------- i18n ---------- */
+
+/* =====================================================================
+   FRUIT CONFIG — everything that differs between durian & avocado.
+   Durian: official pass/fail per มกษ. 3-2567.
+   Avocado: reference-only (มกษ. 31-2567), never judges pass/fail
+            because there is no official Thai dry-matter standard.
+   ===================================================================== */
+const FRUITS = {
+  durian: {
+    key: 'durian',
+    table: 'durian_tests',
+    sessionName: 'durian',
+    judged: true,                 // true = official pass/fail
+    thresholds: { 'หมอนทอง':32, 'ก้านยาว':32, 'ชะนี':30, 'พวงมณี':30, 'กระดุมทอง':27, 'อื่นๆ':null },
+    varieties: [
+      { value:'หมอนทอง', th:'หมอนทอง', en:'Monthong' },
+      { value:'ก้านยาว', th:'ก้านยาว', en:'Kan Yao' },
+      { value:'ชะนี', th:'ชะนี', en:'Chanee' },
+      { value:'พวงมณี', th:'พวงมณี', en:'Puangmanee' },
+      { value:'กระดุมทอง', th:'กระดุมทอง', en:'Kradum Thong' },
+      { value:'อื่นๆ', th:'อื่นๆ', en:'Other' }
+    ],
+    i18n: {
+      app_name:{th:'แอปหาน้ำหนักแห้งทุเรียน',en:'Durian Dry Matter Calculator'},
+      app_sub:{th:'เครื่องคำนวณน้ำหนักแห้งทุเรียน',en:'Dry matter calculator'},
+      lbl_variety:{th:'พันธุ์ทุเรียน',en:'Variety'},
+      lbl_samples:{th:'ตัวอย่างทุเรียนในรอบนี้',en:'Fruit samples in this batch'},
+      rpt_title:{th:'รายงานผลตรวจน้ำหนักเนื้อแห้งทุเรียน',en:'Durian dry matter test report'},
+      no_threshold:{th:'ไม่มีเกณฑ์ทางการ แสดงเฉพาะตัวเลข',en:'No official threshold — number only'},
+      reference_label:{th:'เกณฑ์ขั้นต่ำ (มกษ. 3-2567)',en:'Min threshold (TAS 3-2024)'}
+    }
+  },
+  avocado: {
+    key: 'avocado',
+    table: 'avocado_tests',
+    sessionName: 'avocado',
+    judged: false,                // reference-only, no pass/fail
+    thresholds: { 'ปีเตอร์สัน':19, 'พิงเคอร์ตัน':20, 'แฮสส์':21, 'บักคาเนียร์':19, 'บูท 7':19, 'บูท 8':19, 'อื่นๆ':null },
+    varieties: [
+      { value:'ปีเตอร์สัน', th:'ปีเตอร์สัน', en:'Peterson' },
+      { value:'พิงเคอร์ตัน', th:'พิงเคอร์ตัน', en:'Pinkerton' },
+      { value:'แฮสส์', th:'แฮสส์', en:'Hass' },
+      { value:'บักคาเนียร์', th:'บักคาเนียร์', en:'Buccaneer' },
+      { value:'บูท 7', th:'บูท 7', en:'Booth 7' },
+      { value:'บูท 8', th:'บูท 8', en:'Booth 8' },
+      { value:'อื่นๆ', th:'อื่นๆ / พันธุ์พื้นเมือง', en:'Other / local variety' }
+    ],
+    i18n: {
+      app_name:{th:'แอปหาน้ำหนักแห้งอะโวคาโด',en:'Avocado Dry Matter Calculator'},
+      app_sub:{th:'เครื่องคำนวณน้ำหนักแห้งอะโวคาโด',en:'Dry matter calculator'},
+      lbl_variety:{th:'พันธุ์อะโวคาโด',en:'Variety'},
+      lbl_samples:{th:'ตัวอย่างอะโวคาโดในรอบนี้',en:'Fruit samples in this batch'},
+      rpt_title:{th:'รายงานผลตรวจน้ำหนักเนื้อแห้งอะโวคาโด',en:'Avocado dry matter test report'},
+      no_threshold:{th:'ไม่มีเกณฑ์อ้างอิง แสดงเฉพาะตัวเลข',en:'No reference value — number only'},
+      reference_label:{th:'เกณฑ์อ้างอิง (มกษ. 31-2567)',en:'Reference (TAS 31-2024)'}
+    }
+  }
+};
+
+/* active fruit — restored from last choice, defaults to durian */
+let currentFruit = (function(){
+  try { const v = localStorage.getItem('dm_fruit'); if(v==='durian'||v==='avocado') return v; } catch(e){}
+  return 'durian';
+})();
+function FRUIT(){ return FRUITS[currentFruit]; }
+/* thresholds/currentVarieties() proxy the active fruit so existing code keeps working */
+function currentThresholds(){ return FRUIT().thresholds; }
+function currentVarieties(){ return FRUIT().varieties; }
+
+function setFruit(fk){
+  if(!FRUITS[fk] || fk===currentFruit) { if(FRUITS[fk]) { /* still refresh */ } else return; }
+  currentFruit = fk;
+  try{ localStorage.setItem('dm_fruit', fk); }catch(e){}
+  document.getElementById('fruit-durian').classList.toggle('active', fk==='durian');
+  document.getElementById('fruit-avocado').classList.toggle('active', fk==='avocado');
+  /* reset the in-progress record round to the new fruit's default variety */
+  farms = [ newFarm() ];
+  applyLang();          // refresh all fruit-dependent labels
+  renderFarms();
+  renderHistory();
+  showView('record');
+}
+
 const dict = {
   app_name:{th:'แอปหาน้ำหนักแห้งอะโวคาโด',en:'Avocado Dry Matter Calculator'},
   app_sub:{th:'เครื่องคำนวณน้ำหนักแห้งอะโวคาโด',en:'Dry matter calculator'},
@@ -367,7 +469,7 @@ const dict = {
   lbl_method:{th:'วิธีอบแห้ง',en:'Drying method'},
   method_mw:{th:'ไมโครเวฟ',en:'Microwave'},
   method_oven:{th:'ตู้อบลมร้อน',en:'Hot air oven'},
-  hint_mw:{th:'อบครั้งละ 2–3 นาที ทำซ้ำ 6–8 รอบ ชั่งน้ำหนักหลังอบทุกรอบจนน้ำหนักคงที่ (ต่างกันไม่เกิน 0.02 g)',en:'2–3 min per round, repeat 6–8 rounds, weigh after every round until weight is stable (≤0.02 g change)'},
+  hint_mw:{th:'ใช้กำลังไฟต่ำสุด อบครั้งละ 2–3 นาที ทำซ้ำ 6–8 รอบ ชั่งน้ำหนักหลังอบทุกรอบจนน้ำหนักคงที่ (ต่างกันไม่เกิน 0.02 g)',en:'Use the lowest power setting, 2–3 min per round, repeat 6–8 rounds, weigh after every round until weight is stable (≤0.02 g change)'},
   hint_oven:{th:'อบต่อเนื่องที่ 60°C นาน 72 ชั่วโมง ชั่งน้ำหนักครั้งเดียวหลังอบเสร็จ',en:'Continuous drying at 60°C for 72 hours, single weighing after drying'},
   lbl_fresh:{th:'น้ำหนักสด (g)',en:'Fresh weight (g)'},
   lbl_fruit_weight:{th:'น้ำหนักผลทั้งลูก (kg)',en:'Whole fruit weight (kg)'},
@@ -432,18 +534,26 @@ const dict = {
   profile_skip:{th:'ข้ามไปก่อน',en:'Skip'},
   profile_submit:{th:'บันทึก',en:'Save'},
   visit_count:{th:'มีผู้เข้าใช้แอปแล้ว',en:'App opened'},
-  visit_times:{th:'ครั้ง',en:'times'}
+  visit_times:{th:'ครั้ง',en:'times'},
+  fruit_durian:{th:'ทุเรียน',en:'Durian'},
+  fruit_avocado:{th:'อะโวคาโด',en:'Avocado'}
 };
 let lang = 'th';
-function t(key){ return dict[key] ? dict[key][lang] : key; }
-function setLang(l){
-  lang = l;
-  document.getElementById('lang-th').classList.toggle('active', l==='th');
-  document.getElementById('lang-en').classList.toggle('active', l==='en');
+function t(key){
+  const _f = FRUIT().i18n;
+  if(_f && _f[key]) return _f[key][lang] || _f[key].th; return dict[key] ? dict[key][lang] : key; }
+function applyLang(){
+  document.getElementById('lang-th').classList.toggle('active', lang==='th');
+  document.getElementById('lang-en').classList.toggle('active', lang==='en');
   document.querySelectorAll('[data-i18n]').forEach(el=>{
     const k = el.getAttribute('data-i18n');
-    if(dict[k]) el.textContent = dict[k][l];
+    const val = t(k);            // t() applies the active fruit's overrides
+    if(val) el.textContent = val;
   });
+}
+function setLang(l){
+  lang = l;
+  applyLang();
   if(typeof farms !== 'undefined') renderFarms();
   renderHistory();
   if(supabaseReady) showVisitCount();
@@ -468,19 +578,9 @@ function showView(v){
 /* Dry-matter thresholds per มกษ. 31-2567 (ตารางที่ จ.2) — สำนักงานมาตรฐานสินค้าเกษตร
    และอาหารแห่งชาติ (มกอช.). Varieties not listed in that table (ฟูเอร์เต, รีด,
    ปากช่อง 1) have no official number here — add one if you have it verified. */
-const thresholds = {
-  'ปีเตอร์สัน':19, 'พิงเคอร์ตัน':20, 'แฮสส์':21, 'บักคาเนียร์':19,
-  'บูท 7':19, 'บูท 8':19, 'อื่นๆ':null
-};
-const VARIETY_OPTIONS = [
-  { value:'ปีเตอร์สัน', th:'ปีเตอร์สัน', en:'Peterson' },
-  { value:'พิงเคอร์ตัน', th:'พิงเคอร์ตัน', en:'Pinkerton' },
-  { value:'แฮสส์', th:'แฮสส์', en:'Hass' },
-  { value:'บักคาเนียร์', th:'บักคาเนียร์', en:'Buccaneer' },
-  { value:'บูท 7', th:'บูท 7', en:'Booth 7' },
-  { value:'บูท 8', th:'บูท 8', en:'Booth 8' },
-  { value:'อื่นๆ', th:'อื่นๆ / พันธุ์พื้นเมือง', en:'Other / local variety' }
-];
+/* thresholds now come from the active fruit — see FRUIT() */
+const thresholds = new Proxy({}, { get:(_,k)=>currentThresholds()[k] });
+/* currentVarieties() replaced by currentVarieties() calls */
 
 /* ---------- drying method (global — applies to the whole inspection round) ---------- */
 let method = 'oven';
@@ -511,7 +611,7 @@ function newFarm(){
   farmSeq++;
   return {
     id: 'f'+farmSeq,
-    variety: VARIETY_OPTIONS[0].value,
+    variety: currentVarieties()[0].value,
     customVariety: '',
     farmName: '', plot: '', daa: '', gps: '',
     samples: [ newSample(null, null, null, [null, null], null) ]
@@ -591,15 +691,15 @@ function checkStableInline(farmId, sampleId){
   }
 }
 function sampleDry(s){
-  const plate = s.plate || 0;
-  let gross;
+  /* scale is tared before each weighing (both oven and microwave), so the
+     entered gross value is already the net dry flesh weight — plate is not
+     subtracted here. The plate field is kept for record-keeping only. */
   if(wmode==='quick'){
-    gross = s.dryQuick || 0;
+    return s.dryQuick || 0;
   } else {
     const vals = s.rounds.filter(v=>v!==null && v!==undefined && !isNaN(v));
-    gross = vals.length ? vals[vals.length-1] : 0;
+    return vals.length ? vals[vals.length-1] : 0;
   }
-  return Math.max(0, gross - plate);
 }
 
 function sampleCardHtml(f, s, sidx){
@@ -662,7 +762,7 @@ function renderFarms(){
     const chipHtml = (threshold!==null && threshold!==undefined)
       ? `<div class="threshold-chip">${t('threshold_label')} ${threshold}%</div>`
       : `<div class="threshold-chip none">${t('no_threshold')}</div>`;
-    const varietyOptions = VARIETY_OPTIONS.map(v=>
+    const varietyOptions = currentVarieties().map(v=>
       `<option value="${v.value}" ${f.variety===v.value?'selected':''}>${lang==='th'?v.th:v.en}</option>`
     ).join('');
     const samplesHtml = f.samples.map((s, sidx)=>sampleCardHtml(f, s, sidx)).join('');
@@ -741,19 +841,26 @@ function computeFarmResult(f){
   const varietyName = (f.variety==='อื่นๆ' && f.customVariety && f.customVariety.trim()) ? f.customVariety.trim() : f.variety;
   const perSample = f.samples.map((s, idx)=>{
     const dry = sampleDry(s);
-    const pct = s.fresh>0 ? (dry/s.fresh*100) : 0;
+    const fresh = s.fresh||0;
+    const pct = fresh>0 ? (dry/fresh*100) : 0;
     const rawRounds = (wmode==='precise')
       ? s.rounds.filter(v=>v!==null && v!==undefined && !isNaN(v)).map(v=>Math.round(v*100)/100)
       : null;
-    return { seq: idx+1, fruitWeight: s.fruitWeight||0, fresh: s.fresh, plate: s.plate||0, dry, pct: Math.round(pct*10)/10, rounds: rawRounds };
+    return { seq: idx+1, fruitWeight: s.fruitWeight||0, fresh, plate: s.plate||0, dry, pct: Math.round(pct*10)/10, rounds: rawRounds };
   });
   const avgPct = perSample.length ? perSample.reduce((a,b)=>a+b.pct,0)/perSample.length : 0;
-  /* no pass/fail judgment — threshold is shown as a reference value only (มกษ. 31-2567) */
+  /* durian: official pass/fail; avocado: reference-only (status stays 'none') */
+  let status = 'none';
+  if(FRUIT().judged && threshold!==null && threshold!==undefined){
+    const failing = perSample.filter(p=>p.pct < threshold);
+    status = failing.length===0 ? 'pass' : 'fail';
+  }
   return {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+    fruit: currentFruit,
     variety: varietyName, farm: f.farmName, plot: f.plot, daa: f.daa, gps: f.gps,
     method, wmode, samples: perSample, sampleCount: perSample.length,
-    pct: Math.round(avgPct*10)/10, threshold, status: 'none',
+    pct: Math.round(avgPct*10)/10, threshold, status,
     date: new Date().toISOString()
   };
 }
@@ -764,7 +871,7 @@ async function calculateAndSaveAll(){
   if(supabaseReady){
     for(const r of results){
       try{
-        await sb.from('avocado_tests').insert({
+        await sb.from(FRUIT().table).insert({
           user_id: currentUserId,
           variety: r.variety, farm: r.farm, plot: r.plot, daa: r.daa, gps: r.gps,
           method: r.method, wmode: r.wmode, samples: r.samples, sample_count: r.sampleCount,
@@ -827,7 +934,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_oA062f13-ltbmPwReF8anw_3HhAv71p';
 /* Base URL this app is deployed at (e.g. your GitHub Pages URL, ending in /).
    Used to build the QR-code link on printed PDF reports so it points to
    view.html on the same site. Fill this in after you deploy. */
-const APP_BASE_URL = 'https://panawatsik-sik.github.io/AVOCADO_DMC/';
+const APP_BASE_URL = 'https://panawatsik-sik.github.io/DM_Calculator/';
 
 let sb = null;
 let currentUserId = null;
@@ -863,10 +970,12 @@ async function showVisitCount(){
     const { count, error } = await sb
       .from('app_sessions')
       .select('*', { count: 'exact', head: true })
-      .eq('app_name', 'avocado');
-    if(error || count===null || count===undefined) return;
+      .eq('app_name', FRUIT().sessionName);
+    if(error){ console.warn('[visit-counter] Supabase error:', error.message, '— ตรวจ RLS policy: role anon ต้องมีสิทธิ์ SELECT บนตาราง app_sessions'); return; }
+    if(count===null || count===undefined){ console.warn('[visit-counter] count is null — likely RLS blocks SELECT for anon'); return; }
+    console.log('[visit-counter] count =', count);
     el.textContent = t('visit_count') + ' ' + count.toLocaleString(lang==='th'?'th-TH':'en-US') + ' ' + t('visit_times');
-  }catch(e){ /* non-critical */ }
+  }catch(e){ console.warn('[visit-counter] exception:', e.message); }
 }
 
 /* usage analytics: one row per app open — query this table directly
@@ -877,7 +986,7 @@ async function logVisit(){
       user_id: currentUserId,
       user_agent: navigator.userAgent,
       lang: lang,
-      app_name: 'avocado'
+      app_name: FRUIT().sessionName
     });
   }catch(e){ /* non-critical — never block app usage on this */ }
 }
@@ -950,7 +1059,7 @@ function showConfigBanner(kind){
 async function loadAllRecords(){
   if(!supabaseReady) return [];
   try{
-    const { data, error } = await sb.from('avocado_tests').select('*').order('test_date', {ascending:false});
+    const { data, error } = await sb.from(FRUIT().table).select('*').order('test_date', {ascending:false});
     if(error) return [];
     return data.map(row=>({
       id: row.id, variety: row.variety, farm: row.farm, plot: row.plot, daa: row.daa, gps: row.gps,
@@ -1001,7 +1110,6 @@ function buildReportHTML(r){
         </tbody>
       </table>
       <p class="rpt-result">${statusText}</p>
-      <p style="font-size:11.5px;color:#555;">${t('disclaimer')}</p>
       <div class="rpt-qr-row">
         <div id="qr-code-box"></div>
         <p class="rpt-qr-caption">${t('rpt_qr_caption')}</p>
@@ -1024,6 +1132,7 @@ function b64EncodeUnicode(str){
 function buildQrUrl(r){
   const round2 = n => Math.round((n||0)*100)/100;
   const payload = {
+    fr: r.fruit || currentFruit,
     v: r.variety, f: r.farm||'', p: r.plot||'', d: r.date, m: r.method, w: r.wmode,
     th: (r.threshold===null||r.threshold===undefined) ? null : r.threshold,
     st: r.status, pct: r.pct, daa: r.daa||'', gps: r.gps||'',
@@ -1271,11 +1380,13 @@ function setYearFilter(v){ activeYear = v; renderHistory(); }
 function setFarmSearch(v){ activeSearch = v; renderHistory(); }
 async function deleteRecord(id){
   if(!supabaseReady) return;
-  try{ await sb.from('avocado_tests').delete().eq('id', id); }catch(e){}
+  try{ await sb.from(FRUIT().table).delete().eq('id', id); }catch(e){}
   renderHistory();
 }
 
 /* ---------- init ---------- */
+document.getElementById('fruit-durian').classList.toggle('active', currentFruit==='durian');
+document.getElementById('fruit-avocado').classList.toggle('active', currentFruit==='avocado');
 setLang('th');
 farms = [ newFarm() ];
 renderFarms();
